@@ -1,7 +1,16 @@
-
 services:
   - type: web
-    name: ocr-space-service
+    name: derivador-service
     env: python
     buildCommand: ""
     startCommand: "python app.py"
+    plan: free
+    envVars:
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: OPERADOR_WHATSAPP_TO
+        sync: false
