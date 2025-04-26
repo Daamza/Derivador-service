@@ -1,42 +1,74 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
 import requests
-import json
+import base64
 
 app = Flask(__name__)
 CORS(app)
 
-OCR_SPACE_API_KEY = "K88111451588957"
+# Variables de entorno que necesitas configurar en Render
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM")  # Ej: whatsapp:+14155238886 (Twilio sandbox o real)
+OPERADOR_WHATSAPP_TO = os.getenv("OPERADOR_WHATSAPP_TO")  # Ej: whatsapp:+54911XXXXXXXX
 
-@app.route("/ocr", methods=["POST"])
-def ocr():
+@app.route("/derivar", methods=["POST"])
+def derivar():
     try:
         data = request.get_json()
-        image_base64 = data.get("image_base64")
 
-        if not image_base64:
-            return jsonify({"error": "No se recibió imagen en base64"}), 400
+        nombre = data.get("nombre")
+        direccion = data.get("direccion")
+        localidad = data.get("localidad")
+        fecha_nacimiento = data.get("fecha_nacimiento")
+        cobertura = data.get("cobertura")
+        afiliado = data.get("afiliado")
+        telefono_paciente = data.get("telefono_paciente")
+        tipo_atencion = data.get("tipo_atencion")
+        imagen_base64 = data.get("imagen_base64")
 
-        payload = {
-            'base64Image': f'data:image/jpeg;base64,{image_base64}',
-            'language': 'spa',
-            'isOverlayRequired': False,
-            'apikey': OCR_SPACE_API_KEY
+        mensaje_texto = f"""{telefono_paciente}
+
+Hola, tienes una nueva consulta de {nombre} para atenderse en {tipo_atencion}.
+
+Datos del paciente:
+- Nombre: {nombre}
+- Dirección: {direccion}
+- Localidad: {localidad}
+- Fecha de nacimiento: {fecha_nacimiento}
+- Cobertura: {cobertura}
+- Número de afiliado: {afiliado}
+
+Gracias compañero!!!"""
+
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Messages.json"
+
+        # Primero enviamos el mensaje de texto
+        payload_text = {
+            'From': TWILIO_WHATSAPP_FROM,
+            'To': OPERADOR_WHATSAPP_TO,
+            'Body': mensaje_texto
         }
+        requests.post(url, data=payload_text, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN))
 
-        response = requests.post('https://api.ocr.space/parse/image', data=payload)
-        result = response.json()
-        parsed_text = result.get("ParsedResults", [{}])[0].get("ParsedText", "")
+        # Luego enviamos la imagen si existe
+        if imagen_base64:
+            # En Twilio, para enviar imagen deberías tenerla alojada en una URL pública.
+            # Como alternativa temporal podríamos usar Twilio Media Services o directamente otro hosting.
+            # Para esta primera versión, mandamos el mensaje de imagen en base64 como futuro paso.
 
-        return jsonify({"text": parsed_text})
-    
+            # O simplemente dejamos preparado para futura implementación de MEDIA_URL.
+            pass
+
+        return jsonify({"status": "OK"})
+
     except Exception as e:
-        return jsonify({"error": f"Ocurrió un error en la llamada a OCR.space: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/", methods=["GET"])
 def root():
-    return "Servicio OCR activo con OCR.space. Usá POST /ocr para enviar imágenes."
+    return "Servicio Derivador activo."
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
